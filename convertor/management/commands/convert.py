@@ -1,12 +1,19 @@
 # vim: set fileencoding=utf-8 :
 
 from django.core.management.base import BaseCommand
-from convertor.models import Message
-import datetime
+from convertor.models import Message, Chat
 from xml.dom.ext.reader import Sax2
 import glob
 import os
 import xml.dom.minidom
+
+
+from datetime import datetime, tzinfo, timedelta
+import time
+
+class TZ(tzinfo):
+	def utcoffset(self,dt): return timedelta(seconds=time.timezone)
+	def dst(self,dt): return timedelta(hours=1)
 
 
 def parse_file(filename):
@@ -26,6 +33,14 @@ def parse_file(filename):
 	year = int(date_xml.getAttribute('year'))
 	month = int(date_xml.getAttribute('month'))
 
+
+	chat = Chat(
+		account = my_from,
+		type = type,
+	)
+	chat.save()
+
+
 	for msg_xml in d.getElementsByTagName('msg'):
 		day_time = msg_xml.getAttribute('time').split()
 		day = int(day_time[0])
@@ -39,7 +54,7 @@ def parse_file(filename):
 
 		myself = True if from_user == my_from else False
 
-		date = datetime.datetime(
+		date = datetime(
 				year = year,
 				month = month,
 				day = day,
@@ -52,12 +67,11 @@ def parse_file(filename):
 
 		msg = Message(
 			date = date,
-			type = type,
 			text = text,
 			from_user = from_user,
 			from_nick = from_nick,
 			myself = myself,
-			account = my_from,
+			chat = chat,
 		)
 		msg.save()
 		print msg
@@ -94,24 +108,21 @@ class Command(BaseCommand):
 
 
 		# Write information
-		for el in Message.objects.filter(myself=False).values('from_user', 'account', 'type').annotate():
-			print el
-			first_date = False
-			from_user = el['from_user']
-			account = el['account']
-			type = el['type']
-			adium_type = 'Jabber' if type == 'jabber' else 'ICQ'
+		for chat_db in Chat.objects.all():
+			msg_qs = chat_db.messages.all()
+			if not msg_qs:
+				continue
 
-
-
-
+			first_date = msg_qs.order_by('date')[0].date
+			from_user = msg_qs.filter(myself=False).order_by('date')[0].from_user
+			adium_type = 'Jabber' if chat_db.type == 'jabber' else 'ICQ'
 
 
 			doc = xml.dom.minidom.Document()
 			chat = doc.createElement("chat")
 			chat.setAttribute("xmlns", "http://purl.org/net/ulf/ns/0.4-02")
-			chat.setAttribute("account", account)
-			chat.setAttribute("service", type)
+			chat.setAttribute("account", chat_db.account)
+			chat.setAttribute("service", chat_db.type)
 			doc.appendChild(chat)
 
 			event = doc.createElement("event")
@@ -120,10 +131,7 @@ class Command(BaseCommand):
 
 			chat.appendChild(event)
 		
-			for m in Message.objects.filter(from_user=from_user, account=account, type=type).order_by('date'):
-
-				if not first_date:
-					first_date = m.date
+			for m in msg_qs.order_by('date'):
 				# Write xml
 # <?xml version="1.0" encoding="UTF-8" ?>
 # <chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="11111111" service="ICQ"><event type="windowOpened" sender="11111111" time="2010-09-20T09:32:31+03:00"/>
@@ -131,7 +139,7 @@ class Command(BaseCommand):
 # </chat>
 				msg = doc.createElement("message")
 				msg.setAttribute("sender", m.from_user)
-				msg.setAttribute("time", m.date.isoformat())
+				msg.setAttribute("time", m.date.replace(tzinfo=TZ()).isoformat())
 				msg.setAttribute("alias", m.from_nick)
 				
 				div = doc.createElement("div")
@@ -146,16 +154,13 @@ class Command(BaseCommand):
 				span_text = doc.createTextNode(m.text)
 				span.appendChild(span_text)
 
-			if not first_date:
-				continue
-
-			event.setAttribute("time", first_date.isoformat())
-			xml_str = doc.toxml(encoding='UTF-8')
+			event.setAttribute("time", first_date.replace(tzinfo=TZ()).isoformat())
+			xml_str = doc.toprettyxml(encoding='UTF-8')
 			# print xml_str
 
 			#Logs/Jabber.myaccount@example.com/toaccount@example.org/toaccount@example.org (2010-09-20T21.29.27+0300).chatlog/toaccount@example.org (2010-09-20T21.29.27+0300).xml
-			seconds_dir = adium_type + '.' + account
-			user_and_date = from_user + ' (%s)' % first_date.isoformat()
+			seconds_dir = adium_type + '.' + chat_db.account
+			user_and_date = from_user + ' (%s)' % first_date.replace(tzinfo=TZ()).isoformat()
 			path = os.path.join(
 						adium_dir,
 						'Logs',
