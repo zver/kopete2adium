@@ -1,0 +1,6 @@
+For convert your kopete logs to adium format you should run:
+	./manage.py syncdb && ./manage.py convert <kopete_dir> <adium_dir>
+<kopete_dir> directory must be exist and consist kopete logs
+
+
+Requires: django >= 1.1 with dbbackend-sqlite3 module and xml python module
