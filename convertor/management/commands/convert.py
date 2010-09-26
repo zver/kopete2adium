@@ -155,7 +155,7 @@ class Command(BaseCommand):
 				span.appendChild(span_text)
 
 			event.setAttribute("time", first_date.replace(tzinfo=TZ()).isoformat())
-			xml_str = doc.toprettyxml(encoding='UTF-8')
+			xml_str = doc.toxml(encoding='UTF-8')
 			# print xml_str
 
 			#Logs/Jabber.myaccount@example.com/toaccount@example.org/toaccount@example.org (2010-09-20T21.29.27+0300).chatlog/toaccount@example.org (2010-09-20T21.29.27+0300).xml
