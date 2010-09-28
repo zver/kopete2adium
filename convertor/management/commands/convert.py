@@ -11,9 +11,14 @@ import xml.dom.minidom
 from datetime import datetime, tzinfo, timedelta
 import time
 
+TZ_SECONDS = time.timezone
+
+def adium_format_date(dt):
+	return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+
 class TZ(tzinfo):
-	def utcoffset(self,dt): return timedelta(seconds=time.timezone)
-	def dst(self,dt): return timedelta(hours=1)
+	def utcoffset(self, dt): return timedelta(seconds=TZ_SECONDS)
+	def dst(self, dt): return timedelta(hours=1)
 
 
 def parse_file(filename):
@@ -79,11 +84,15 @@ def parse_file(filename):
 
 class Command(BaseCommand):
 	def handle(self, *args, **kwargs):
-		if len(args) != 2:
-			print "Usage:\n ./manage.py <kopete_dir> <adium_dir>"
+		l = len(args)
+		if not l in [2, 3]:
+			print "Usage:\n ./manage.py <kopete_dir> <adium_dir> [TZ_SECONDS]"
 			return
 		kopete_dir = args[0]
 		adium_dir = args[1]
+		if l == 3:
+			global TZ_SECONDS
+			TZ_SECONDS = int(args[2])
 		
 		if not os.path.isdir(kopete_dir):
 			print u"Kopete dir %s doesn't exist." % kopete_dir
@@ -139,8 +148,8 @@ class Command(BaseCommand):
 # </chat>
 				msg = doc.createElement("message")
 				msg.setAttribute("sender", m.from_user)
-				msg.setAttribute("time", m.date.replace(tzinfo=TZ()).isoformat())
-				msg.setAttribute("alias", m.from_nick)
+				msg.setAttribute("time", adium_format_date(  m.date.replace(tzinfo=TZ()) ) )
+				msg.setAttribute("alias", m.from_user)
 				
 				div = doc.createElement("div")
 				msg.appendChild(div)
@@ -154,13 +163,13 @@ class Command(BaseCommand):
 				span_text = doc.createTextNode(m.text)
 				span.appendChild(span_text)
 
-			event.setAttribute("time", first_date.replace(tzinfo=TZ()).isoformat())
+			event.setAttribute("time", adium_format_date( first_date.replace(tzinfo=TZ()) ) )
 			xml_str = doc.toxml(encoding='UTF-8')
 			# print xml_str
 
 			#Logs/Jabber.myaccount@example.com/toaccount@example.org/toaccount@example.org (2010-09-20T21.29.27+0300).chatlog/toaccount@example.org (2010-09-20T21.29.27+0300).xml
 			seconds_dir = adium_type + '.' + chat_db.account
-			user_and_date = from_user + ' (%s)' % first_date.replace(tzinfo=TZ()).isoformat()
+			user_and_date = from_user + ' (%s)' % adium_format_date( first_date.replace(tzinfo=TZ()) )
 			path = os.path.join(
 						adium_dir,
 						'Logs',
