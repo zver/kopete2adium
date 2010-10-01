@@ -10,6 +10,7 @@ TYPES = (
 class Chat(models.Model):
 	account = models.CharField(u'Аккаунт', max_length=100)
 	type = models.SlugField(u'Тип', choices=TYPES)
+	with_account = models.CharField(u'Чат с', max_length=100)
 
 class Message(models.Model):
 	date = models.DateTimeField(u'Дата')

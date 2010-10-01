@@ -32,9 +32,13 @@ def parse_file(filename):
 	head = d.getElementsByTagName('head')[0]
 	date_xml = head.getElementsByTagName('date')[0]
 	my_from = ''
+	with_account = None
 	for c in head.getElementsByTagName('contact'):
-		if c.hasAttribute('type') and c.getAttribute('type') == 'myself':
-			my_from = c.getAttribute('contactId')
+		if c.hasAttribute('type'):
+			if c.getAttribute('type') == 'myself':
+				my_from = c.getAttribute('contactId')
+		else:
+			with_account = c.getAttribute('contactId')
 	year = int(date_xml.getAttribute('year'))
 	month = int(date_xml.getAttribute('month'))
 
@@ -42,6 +46,7 @@ def parse_file(filename):
 	chat = Chat(
 		account = my_from,
 		type = type,
+		with_account = with_account,
 	)
 	chat.save()
 
@@ -123,7 +128,7 @@ class Command(BaseCommand):
 				continue
 
 			first_date = msg_qs.order_by('date')[0].date
-			from_user = msg_qs.filter(myself=False).order_by('date')[0].from_user
+			from_user = chat_db.with_account
 			adium_type = 'Jabber' if chat_db.type == 'jabber' else 'ICQ'
 
 
