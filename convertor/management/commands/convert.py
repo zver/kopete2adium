@@ -1,6 +1,7 @@
 # vim: set fileencoding=utf-8 :
 
 from django.core.management.base import BaseCommand
+from django.db.models import Max, Min
 from convertor.models import Message, Chat
 from xml.dom.ext.reader import Sax2
 import glob
@@ -11,10 +12,13 @@ import xml.dom.minidom
 from datetime import datetime, tzinfo, timedelta
 import time
 
+
+
 TZ_SECONDS = time.timezone
 
 def adium_format_date(dt):
 	return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+
 
 class TZ(tzinfo):
 	def utcoffset(self, dt): return timedelta(seconds=TZ_SECONDS)
@@ -87,6 +91,29 @@ def parse_file(filename):
 		print msg
 
 
+def split_chats():
+	""" Split chats by day """
+	for c in list(Chat.objects.all()):
+		msg_qs = Message.objects.filter(chat=c)
+		stats = msg_qs.aggregate(Max('date'), Min('date'))
+		d = stats['date__min']
+		d = d.replace(microsecond=0, second=0, hour=0, minute=0)
+		first = True
+		while d < stats['date__max']:
+			d2 = d + timedelta(days=1)
+			if first:
+				first = False
+			else:
+				new_chat = Chat(
+					account = c.account,
+					type = c.type,
+					with_account = c.with_account
+				)
+				new_chat.save()
+				msg_qs.filter(date__gte=d, date_lte=d2).update(chat=new_chat)
+			d = d2
+
+
 class Command(BaseCommand):
 	def handle(self, *args, **kwargs):
 		l = len(args)
@@ -120,6 +147,7 @@ class Command(BaseCommand):
 		for f in glob.glob(kopete_dir + '*/*/*.xml'):
 			parse_file(f)
 
+		split_chats()
 
 		# Write information
 		for chat_db in Chat.objects.all():
