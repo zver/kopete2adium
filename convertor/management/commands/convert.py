@@ -99,6 +99,8 @@ def split_chats():
 	for c in list(Chat.objects.all()):
 		msg_qs = Message.objects.filter(chat=c)
 		stats = msg_qs.aggregate(Max('date'), Min('date'))
+		if not stats['date__min'] or not stats['date__max']:
+			continue
 		d = stats['date__min']
 		d = d.replace(microsecond=0, second=0, hour=0, minute=0)
 		first = True
@@ -113,7 +115,7 @@ def split_chats():
 					with_account = c.with_account
 				)
 				new_chat.save()
-				msg_qs.filter(date__gte=d, date_lte=d2).update(chat=new_chat)
+				msg_qs.filter(date__gte=d, date__lte=d2).update(chat=new_chat)
 			d = d2
 
 
