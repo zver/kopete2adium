@@ -77,7 +77,10 @@ def parse_file(filename):
 				second = seconds,
 		)
 
-		text = msg_xml.childNodes[0].nodeValue
+		if msg_xml.hasChildNodes():
+			text = msg_xml.childNodes[0].nodeValue
+		else:
+			test = u''
 
 		msg = Message(
 			date = date,
